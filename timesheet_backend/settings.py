@@ -23,7 +23,9 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'authentication',
-    'employees',  # Added employees app
+    'employees',
+    'projects',
+    'timesheets',  # Added timesheets app
 ]
 
 # Disable CSRF for development (API testing)
