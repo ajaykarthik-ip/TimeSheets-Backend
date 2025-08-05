@@ -23,18 +23,25 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'authentication',
+    'employees',  # Added employees app
 ]
+
+# Disable CSRF for development (API testing)
+DISABLE_CSRF = True
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+# Only add CSRF middleware if not disabled
+if not DISABLE_CSRF:
+    MIDDLEWARE.insert(4, 'django.middleware.csrf.CsrfViewMiddleware')
 
 ROOT_URLCONF = 'timesheet_backend.urls'
 
@@ -107,15 +114,25 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+    ],
 }
 
-# CORS settings for frontend
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # Next.js development server
+# CORS settings
+CORS_ALLOW_ALL_ORIGINS = True  # Only for development!
+CORS_ALLOW_CREDENTIALS = True
+
+# CSRF settings - COMPLETELY DISABLE
+CSRF_COOKIE_SECURE = False
+CSRF_USE_SESSIONS = False
+CSRF_COOKIE_HTTPONLY = False
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
-
-CORS_ALLOW_CREDENTIALS = True
 
 # Session settings
 SESSION_COOKIE_AGE = 86400  # 24 hours

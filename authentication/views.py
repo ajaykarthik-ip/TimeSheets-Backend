@@ -5,43 +5,59 @@ from rest_framework.response import Response
 from django.contrib.auth import login, logout
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+from django.http import JsonResponse
+import json
 from .serializers import RegisterSerializer, LoginSerializer, UserSerializer
 
-@api_view(['POST'])
-@permission_classes([AllowAny])
+@csrf_exempt
 def register_view(request):
-    """Register a new user"""
-    serializer = RegisterSerializer(data=request.data)
-    if serializer.is_valid():
-        user = serializer.save()
-        return Response({
-            'message': 'User created successfully',
-            'user': UserSerializer(user).data
-        }, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    """Register a new user - Pure Django view"""
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            serializer = RegisterSerializer(data=data)
+            if serializer.is_valid():
+                user = serializer.save()
+                return JsonResponse({
+                    'message': 'User created successfully',
+                    'user': UserSerializer(user).data
+                }, status=201)
+            return JsonResponse(serializer.errors, status=400)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
 
-@api_view(['POST'])
-@permission_classes([AllowAny])
+@csrf_exempt
 def login_view(request):
-    """Login user"""
-    serializer = LoginSerializer(data=request.data)
-    if serializer.is_valid():
-        user = serializer.validated_data['user']
-        login(request, user)
-        return Response({
-            'message': 'Login successful',
-            'user': UserSerializer(user).data
-        }, status=status.HTTP_200_OK)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    """Login user - Pure Django view"""
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            serializer = LoginSerializer(data=data)
+            if serializer.is_valid():
+                user = serializer.validated_data['user']
+                login(request, user)
+                return JsonResponse({
+                    'message': 'Login successful',
+                    'user': UserSerializer(user).data
+                }, status=200)
+            return JsonResponse(serializer.errors, status=400)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@csrf_exempt
 def logout_view(request):
-    """Logout user"""
-    logout(request)
-    return Response({
-        'message': 'Logout successful'
-    }, status=status.HTTP_200_OK)
+    """Logout user - Pure Django view"""
+    if request.method == 'POST':
+        try:
+            if request.user.is_authenticated:
+                logout(request)
+                return JsonResponse({'message': 'Logout successful'}, status=200)
+            return JsonResponse({'error': 'Not authenticated'}, status=401)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -51,11 +67,10 @@ def user_profile(request):
         'user': UserSerializer(request.user).data
     }, status=status.HTTP_200_OK)
 
-@api_view(['GET'])
-@permission_classes([AllowAny])
+@csrf_exempt
 def csrf_token(request):
     """Get CSRF token for frontend"""
     from django.middleware.csrf import get_token
-    return Response({
+    return JsonResponse({
         'csrfToken': get_token(request)
     })
