@@ -4,9 +4,15 @@ from django.core.exceptions import ValidationError
 from employees.models import Employee
 from projects.models import Project
 from datetime import date
+from django.utils import timezone
 import json
 
 class Timesheet(models.Model):
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('submitted', 'Submitted'),
+    ]
+    
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='timesheets')
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='timesheets')
     activity_type = models.CharField(max_length=100)
@@ -18,6 +24,9 @@ class Timesheet(models.Model):
     )
     description = models.TextField(blank=True, null=True)
     
+    # NEW: Status field for draft functionality
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    
     # Denormalized fields for faster queries
     employee_name = models.CharField(max_length=101, blank=True)  # first_name + last_name
     project_name = models.CharField(max_length=200, blank=True)
@@ -25,11 +34,12 @@ class Timesheet(models.Model):
     # Audit fields
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)  # NEW: Track submission time
     
     class Meta:
         ordering = ['-date', '-created_at']
-        # Unique constraint to prevent duplicate entries
-        unique_together = ['employee', 'project', 'date', 'activity_type']
+        # Modified unique constraint - allows multiple drafts but only one submitted per combination
+        unique_together = ['employee', 'project', 'date', 'activity_type', 'status']
         
         # Database indexes for performance
         indexes = [
@@ -38,33 +48,35 @@ class Timesheet(models.Model):
             models.Index(fields=['date']),              # Date range queries
             models.Index(fields=['employee', 'project', 'date']),  # Combined queries
             models.Index(fields=['-created_at']),       # Recent entries
+            models.Index(fields=['status']),            # NEW: Status filtering
         ]
     
     def __str__(self):
-        return f"{self.employee_name} - {self.project_name} - {self.date}"
+        return f"{self.employee_name} - {self.project_name} - {self.date} ({self.status})"
     
     def clean(self):
-        """Model-level validation"""
-        # Check if date is not in the future
-        if self.date and self.date > date.today():
-            raise ValidationError('Date cannot be in the future.')
-        
-        # Validate activity type exists in project
-        if self.project and self.activity_type:
-            project_activities = self.project.get_activity_types()
-            if project_activities and self.activity_type not in project_activities:
-                raise ValidationError(
-                    f'Activity type "{self.activity_type}" is not valid for project "{self.project.name}". '
-                    f'Valid activities: {", ".join(project_activities)}'
-                )
-        
-        # Check if employee is active
-        if self.employee and not self.employee.is_active:
-            raise ValidationError('Cannot create timesheet for inactive employee.')
-        
-        # Check if project is active
-        if self.project and self.project.status != 'active':
-            raise ValidationError('Cannot create timesheet for inactive project.')
+        """Model-level validation - only for submitted timesheets"""
+        if self.status == 'submitted':
+            # Check if date is not in the future
+            if self.date and self.date > date.today():
+                raise ValidationError('Date cannot be in the future.')
+            
+            # Validate activity type exists in project
+            if self.project and self.activity_type:
+                project_activities = self.project.get_activity_types()
+                if project_activities and self.activity_type not in project_activities:
+                    raise ValidationError(
+                        f'Activity type "{self.activity_type}" is not valid for project "{self.project.name}". '
+                        f'Valid activities: {", ".join(project_activities)}'
+                    )
+            
+            # Check if employee is active
+            if self.employee and not self.employee.is_active:
+                raise ValidationError('Cannot submit timesheet for inactive employee.')
+            
+            # Check if project is active
+            if self.project and self.project.status != 'active':
+                raise ValidationError('Cannot submit timesheet for inactive project.')
     
     def save(self, *args, **kwargs):
         # Auto-populate denormalized fields
@@ -73,9 +85,27 @@ class Timesheet(models.Model):
         if self.project:
             self.project_name = self.project.name
         
-        # Run validations
-        self.full_clean()
+        # Set submitted_at when status changes to submitted
+        if self.status == 'submitted' and not self.submitted_at:
+            self.submitted_at = timezone.now()
+        
+        # Only validate submitted timesheets
+        if self.status == 'submitted':
+            self.full_clean()
+        
         super().save(*args, **kwargs)
+    
+    def submit(self):
+        """Submit a draft timesheet"""
+        if self.status == 'draft':
+            self.status = 'submitted'
+            self.submitted_at = timezone.now()
+            self.save()
+    
+    @property
+    def can_edit(self):
+        """Check if timesheet can be edited"""
+        return self.status == 'draft'
     
     @property
     def total_hours_for_date(self):

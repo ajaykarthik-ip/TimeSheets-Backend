@@ -13,7 +13,8 @@ import json
 from .models import Timesheet
 from .serializers import (
     TimesheetSerializer, TimesheetListSerializer, 
-    TimesheetCreateSerializer, TimesheetSummarySerializer
+    TimesheetCreateSerializer, TimesheetSummarySerializer,
+    TimesheetDraftSerializer  # NEW import
 )
 from employees.models import Employee
 from projects.models import Project
@@ -59,6 +60,11 @@ def timesheet_list_create(request):
         project_id = request.GET.get('project_id')
         if project_id:
             timesheets = timesheets.filter(project_id=project_id)
+        
+        # NEW: Status filtering
+        status_filter = request.GET.get('status')
+        if status_filter:
+            timesheets = timesheets.filter(status=status_filter)
         
         # Date filtering
         date_from = request.GET.get('date_from')
@@ -117,7 +123,8 @@ def timesheet_list_create(request):
                 'date_to': date_to,
                 'employee_id': employee_id,
                 'project_id': project_id,
-                'activity_type': activity_type
+                'activity_type': activity_type,
+                'status': status_filter  # NEW
             }
         })
     
@@ -172,6 +179,10 @@ def timesheet_detail(request, pk):
         })
     
     elif request.method == 'PUT':
+        # NEW: Check if timesheet can be edited
+        if not timesheet.can_edit:
+            return JsonResponse({'error': 'Cannot edit submitted timesheet'}, status=400)
+        
         try:
             data = json.loads(request.body)
             serializer = TimesheetSerializer(timesheet, data=data, partial=True)
@@ -193,6 +204,10 @@ def timesheet_detail(request, pk):
             return JsonResponse({'error': str(e)}, status=400)
     
     elif request.method == 'DELETE':
+        # NEW: Check if timesheet can be deleted (only drafts)
+        if timesheet.status == 'submitted':
+            return JsonResponse({'error': 'Cannot delete submitted timesheet'}, status=400)
+        
         try:
             with transaction.atomic():
                 timesheet.delete()
@@ -239,15 +254,78 @@ def my_timesheets(request):
     
     # Calculate summary
     total_hours = timesheets.aggregate(total=Sum('hours_worked'))['total'] or 0
+    draft_count = timesheets.filter(status='draft').count()
+    submitted_count = timesheets.filter(status='submitted').count()
     
     return Response({
         'timesheets': serializer.data,
         'summary': {
             'total_hours': float(total_hours),
             'total_entries': timesheets.count(),
+            'draft_count': draft_count,      # NEW
+            'submitted_count': submitted_count,  # NEW
             'date_range': f"{date_from} to {date_to}"
         }
     })
+
+# NEW FUNCTION: Get user's drafts
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def drafts_list(request):
+    """Get current user's draft timesheets"""
+    try:
+        employee = request.user.employee
+    except Employee.DoesNotExist:
+        return Response({'error': 'User does not have an employee record'}, status=400)
+    
+    drafts = Timesheet.objects.filter(
+        employee=employee,
+        status='draft'
+    ).select_related('project').order_by('-created_at')
+    
+    serializer = TimesheetDraftSerializer(drafts, many=True)
+    
+    return Response({
+        'drafts': serializer.data,
+        'total_drafts': drafts.count()
+    })
+
+# NEW FUNCTION: Submit a draft
+@csrf_exempt
+def submit_timesheet(request, pk):
+    """Submit a draft timesheet"""
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    
+    if request.method != 'PUT':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        timesheet = Timesheet.objects.get(pk=pk)
+    except Timesheet.DoesNotExist:
+        return JsonResponse({'error': 'Timesheet not found'}, status=404)
+    
+    # Check permissions
+    if not request.user.is_staff and timesheet.employee.user != request.user:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    
+    # Check if it's a draft
+    if timesheet.status != 'draft':
+        return JsonResponse({'error': 'Only draft timesheets can be submitted'}, status=400)
+    
+    try:
+        with transaction.atomic():
+            timesheet.submit()
+        
+        return JsonResponse({
+            'message': 'Timesheet submitted successfully',
+            'timesheet': TimesheetSerializer(timesheet).data
+        })
+    except Exception as e:
+        return JsonResponse({
+            'error': 'Failed to submit timesheet',
+            'details': str(e)
+        }, status=400)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

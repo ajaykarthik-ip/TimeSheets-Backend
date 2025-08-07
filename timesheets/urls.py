@@ -10,6 +10,10 @@ urlpatterns = [
     path('my-timesheets/', views.my_timesheets, name='my-timesheets'),
     path('current-user/', views.current_user_employee, name='current-user-employee'),
     
+    # NEW: Draft functionality
+    path('drafts/', views.drafts_list, name='drafts-list'),
+    path('<int:pk>/submit/', views.submit_timesheet, name='submit-timesheet'),
+    
     # Analytics and summary
     path('summary/', views.timesheet_summary, name='timesheet-summary'),
     
