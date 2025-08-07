@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.core.cache import cache
 
 class Employee(models.Model):
     ROLE_CHOICES = [
@@ -23,16 +24,16 @@ class Employee(models.Model):
     ]
     
     # Auto-generated employee ID
-    employee_id = models.CharField(max_length=20, unique=True, blank=True)
+    employee_id = models.CharField(max_length=20, unique=True, blank=True, db_index=True)
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='employee')
-    first_name = models.CharField(max_length=50)
-    last_name = models.CharField(max_length=50)
-    email = models.EmailField(unique=True)
+    first_name = models.CharField(max_length=50, db_index=True)
+    last_name = models.CharField(max_length=50, db_index=True)
+    email = models.EmailField(unique=True, db_index=True)
     phone = models.CharField(max_length=15, blank=True, null=True)
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
-    department = models.CharField(max_length=20, choices=DEPARTMENT_CHOICES)
-    hire_date = models.DateField()
-    is_active = models.BooleanField(default=True)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, db_index=True)
+    department = models.CharField(max_length=20, choices=DEPARTMENT_CHOICES, db_index=True)
+    hire_date = models.DateField(db_index=True)
+    is_active = models.BooleanField(default=True, db_index=True)
     hourly_rate = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     manager = models.ForeignKey('self', on_delete=models.SET_NULL, blank=True, null=True, related_name='subordinates')
     address = models.TextField(blank=True, null=True)
@@ -43,30 +44,52 @@ class Employee(models.Model):
     
     class Meta:
         ordering = ['employee_id']
+        indexes = [
+            # Optimized indexes for common queries
+            models.Index(fields=['email']),  # For email lookups in authentication
+            models.Index(fields=['department', 'is_active']),  # For filtering active employees by department
+            models.Index(fields=['role', 'is_active']),  # For filtering active employees by role
+            models.Index(fields=['manager', 'is_active']),  # For manager hierarchy queries
+            models.Index(fields=['is_active', 'hire_date']),  # For active employee reports
+            models.Index(fields=['employee_id', 'is_active']),  # Most common lookup pattern
+            models.Index(fields=['first_name', 'last_name']),  # For name searches
+            models.Index(fields=['-created_at']),  # For recent employee reports
+        ]
         
     def save(self, *args, **kwargs):
         if not self.employee_id:
             self.employee_id = self.generate_employee_id()
+        
+        # Clear related cache when employee is saved
+        if self.pk:
+            cache.delete(f'employee_{self.pk}')
+            cache.delete('managers_list')
+            cache.delete('employee_choices')
+            
         super().save(*args, **kwargs)
     
     def generate_employee_id(self):
         """Generate employee ID in format: EMP001, EMP002, etc."""
-        last_employee = Employee.objects.filter(
-            employee_id__startswith='EMP'
-        ).order_by('employee_id').last()
+        # Use database-level atomic operation for better performance
+        from django.db import transaction
         
-        if last_employee:
-            # Extract number from last employee ID (e.g., 'EMP001' -> 1)
-            try:
-                last_number = int(last_employee.employee_id[3:])
-                new_number = last_number + 1
-            except (ValueError, IndexError):
+        with transaction.atomic():
+            last_employee = Employee.objects.filter(
+                employee_id__startswith='EMP'
+            ).order_by('employee_id').last()
+            
+            if last_employee:
+                # Extract number from last employee ID (e.g., 'EMP001' -> 1)
+                try:
+                    last_number = int(last_employee.employee_id[3:])
+                    new_number = last_number + 1
+                except (ValueError, IndexError):
+                    new_number = 1
+            else:
                 new_number = 1
-        else:
-            new_number = 1
-        
-        # Format with leading zeros (EMP001, EMP002, etc.)
-        return f"EMP{new_number:03d}"
+            
+            # Format with leading zeros (EMP001, EMP002, etc.)
+            return f"EMP{new_number:03d}"
     
     def __str__(self):
         return f"{self.employee_id} - {self.first_name} {self.last_name}"
@@ -74,3 +97,33 @@ class Employee(models.Model):
     @property
     def full_name(self):
         return f"{self.first_name} {self.last_name}"
+    
+    @classmethod
+    def get_active_managers(cls):
+        """Cached method to get active managers"""
+        cache_key = 'active_managers'
+        managers = cache.get(cache_key)
+        
+        if managers is None:
+            managers = cls.objects.filter(
+                role__in=['manager', 'admin'],
+                is_active=True
+            ).values('id', 'employee_id', 'first_name', 'last_name').order_by('first_name')
+            cache.set(cache_key, list(managers), 1800)  # Cache for 30 minutes
+        
+        return managers
+    
+    @classmethod
+    def get_choices(cls):
+        """Cached method to get role and department choices"""
+        cache_key = 'employee_choices'
+        choices = cache.get(cache_key)
+        
+        if choices is None:
+            choices = {
+                'roles': dict(cls.ROLE_CHOICES),
+                'departments': dict(cls.DEPARTMENT_CHOICES)
+            }
+            cache.set(cache_key, choices, 3600)  # Cache for 1 hour
+        
+        return choices

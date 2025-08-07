@@ -10,5 +10,7 @@ urlpatterns = [
     # Helper endpoints
     path('choices/', views.employee_choices, name='employee-choices'),
     path('managers/', views.managers_list, name='managers-list'),
+    
+    # Debug endpoint
     path('debug/', views.debug_employee_create, name='debug-create'),
 ]

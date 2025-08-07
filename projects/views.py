@@ -9,6 +9,8 @@ from django.http import JsonResponse
 import json
 from .models import Project
 from .serializers import ProjectSerializer, ProjectListSerializer
+from django.core.paginator import Paginator
+from django.db.models import Prefetch
 
 @csrf_exempt
 def project_list_create(request):

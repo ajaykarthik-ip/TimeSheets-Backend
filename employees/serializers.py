@@ -3,10 +3,11 @@ from django.contrib.auth.models import User
 from .models import Employee
 
 class EmployeeSerializer(serializers.ModelSerializer):
+    """Full serializer for detail views and create/update operations"""
     full_name = serializers.ReadOnlyField()
     manager_name = serializers.SerializerMethodField()
-    username = serializers.CharField(write_only=True)
-    password = serializers.CharField(write_only=True, min_length=8)
+    username = serializers.CharField(write_only=True, required=False)
+    password = serializers.CharField(write_only=True, min_length=8, required=False)
     
     class Meta:
         model = Employee
@@ -19,17 +20,25 @@ class EmployeeSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at', 'full_name', 'manager_name']
     
     def get_manager_name(self, obj):
-        return obj.manager.full_name if obj.manager else None
+        """Optimized manager name retrieval"""
+        if obj.manager_id:  # Use manager_id to avoid additional query
+            # This assumes manager is already prefetched in the view
+            return obj.manager.full_name if obj.manager else None
+        return None
     
     def create(self, validated_data):
-        username = validated_data.pop('username')
-        password = validated_data.pop('password')
+        username = validated_data.pop('username', None)
+        password = validated_data.pop('password', None)
+        
+        if not username:
+            # Auto-generate username from email
+            username = validated_data['email'].split('@')[0]
         
         # Create user account
         user = User.objects.create_user(
             username=username,
             email=validated_data['email'],
-            password=password,
+            password=password or 'temppass123',  # Default password if not provided
             first_name=validated_data['first_name'],
             last_name=validated_data['last_name']
         )
@@ -59,9 +68,9 @@ class EmployeeSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 class EmployeeListSerializer(serializers.ModelSerializer):
-    """Simplified serializer for list views"""
+    """Optimized serializer for list views - only essential fields"""
     full_name = serializers.ReadOnlyField()
-    manager_name = serializers.SerializerMethodField()
+    manager_name = serializers.CharField(source='manager.full_name', read_only=True)
     
     class Meta:
         model = Employee
@@ -69,6 +78,27 @@ class EmployeeListSerializer(serializers.ModelSerializer):
             'id', 'employee_id', 'full_name', 'email', 'role', 
             'department', 'manager_name', 'is_active', 'hire_date'
         ]
+
+class EmployeeMinimalSerializer(serializers.ModelSerializer):
+    """Ultra-minimal serializer for dropdowns and quick lookups"""
+    full_name = serializers.ReadOnlyField()
     
-    def get_manager_name(self, obj):
-        return obj.manager.full_name if obj.manager else None
+    class Meta:
+        model = Employee
+        fields = ['id', 'employee_id', 'full_name', 'role', 'is_active']
+
+class ManagerListSerializer(serializers.ModelSerializer):
+    """Serializer for manager dropdown lists"""
+    full_name = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = Employee
+        fields = ['id', 'employee_id', 'full_name']
+
+class EmployeeStatsSerializer(serializers.Serializer):
+    """Serializer for employee statistics"""
+    total_employees = serializers.IntegerField()
+    active_employees = serializers.IntegerField()
+    by_department = serializers.DictField()
+    by_role = serializers.DictField()
+    recent_hires = serializers.IntegerField()
