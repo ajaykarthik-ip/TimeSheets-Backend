@@ -1,0 +1,8 @@
+SECRET_KEY=django-insecure-aj-very-long-secret-key-for-development-only-change-in-production-12345
+DEBUG=True
+
+DB_NAME=neondb
+DB_USER=neondb_owner
+DB_PASSWORD=npg_7mJc1vBKhtTY
+DB_HOST=ep-jolly-paper-aefqrvrf-pooler.c-2.us-east-2.aws.neon.tech
+DB_PORT=5432

@@ -1,6 +1,8 @@
 from rest_framework import serializers
-from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.contrib.auth import authenticate 
+from django.utils import timezone
+from employees.models import Employee
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
@@ -18,7 +20,20 @@ class RegisterSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data.pop('password_confirm')
         user = User.objects.create_user(**validated_data)
+
+        # ✅ Create linked Employee with default values
+        Employee.objects.create(
+            user=user,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            email=user.email,
+            role='intern',  # default role
+            department='engineering',  # default department
+            hire_date=timezone.now(),
+        )
+
         return user
+
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
