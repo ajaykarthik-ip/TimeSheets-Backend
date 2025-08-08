@@ -7,7 +7,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.http import JsonResponse
 import json
-from .serializers import RegisterSerializer, LoginSerializer, UserSerializer
+from .serializers import RegisterSerializer, LoginSerializer, UserSerializer, GoogleLoginSerializer
 
 @csrf_exempt
 def register_view(request):
@@ -74,3 +74,47 @@ def csrf_token(request):
     return JsonResponse({
         'csrfToken': get_token(request)
     })
+
+@csrf_exempt
+def google_login_view(request):
+    """Login/Register user with Google OAuth - Pure Django view"""
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            serializer = GoogleLoginSerializer(data=data)
+            
+            if serializer.is_valid():
+                # Get verified Google user data
+                google_data = serializer.validated_data['token']
+                
+                # Create or get user
+                user, created = serializer.create_or_get_user(google_data)
+                
+                # Log the user in
+                login(request, user)
+                
+                # Determine response message
+                if created:
+                    message = 'Account created and logged in successfully with Google'
+                else:
+                    message = 'Logged in successfully with Google'
+                
+                return JsonResponse({
+                    'message': message,
+                    'user': UserSerializer(user).data,
+                    'created': created,
+                    'google_data': {
+                        'picture': google_data.get('picture'),
+                        'email_verified': google_data.get('email_verified', False)
+                    }
+                }, status=200)
+            
+            return JsonResponse(serializer.errors, status=400)
+            
+        except Exception as e:
+            return JsonResponse({
+                'error': 'Google login failed',
+                'details': str(e)
+            }, status=400)
+    
+    return JsonResponse({'error': 'Method not allowed'}, status=405)

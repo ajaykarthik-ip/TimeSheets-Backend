@@ -10,6 +10,7 @@ class Employee(models.Model):
         ('analyst', 'Analyst'),
         ('tester', 'Tester'),
         ('intern', 'Intern'),
+        ('mobiux_employee', 'Mobiux Employee'),
         ('admin', 'Admin'),
     ]
     

@@ -71,3 +71,67 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ('id', 'username', 'email', 'first_name', 'last_name')
         read_only_fields = ('id',)
+
+class GoogleLoginSerializer(serializers.Serializer):
+    token = serializers.CharField(required=True, help_text="Google OAuth token")
+    
+    def validate_token(self, value):
+        """Verify Google token and extract user data"""
+        from .oauth import verify_google_token
+        
+        user_data = verify_google_token(value)
+        if not user_data:
+            raise serializers.ValidationError("Invalid Google token")
+        
+        if not user_data.get('email_verified'):
+            raise serializers.ValidationError("Google email not verified")
+        
+        return user_data
+    
+    def create_or_get_user(self, google_data):
+        """Create new user or get existing user from Google data"""
+        from .oauth import generate_username_from_email, generate_secure_password
+        
+        email = google_data['email']
+        
+        # Check if user already exists
+        try:
+            user = User.objects.get(email=email)
+            return user, False  # User exists, created=False
+        except User.DoesNotExist:
+            pass
+        
+        # Create new user
+        username = generate_username_from_email(email)
+        password = generate_secure_password()
+        
+        # Split full name if first/last names are empty
+        first_name = google_data.get('first_name', '')
+        last_name = google_data.get('last_name', '')
+        
+        if not first_name and not last_name and google_data.get('full_name'):
+            name_parts = google_data['full_name'].split(' ', 1)
+            first_name = name_parts[0]
+            last_name = name_parts[1] if len(name_parts) > 1 else ''
+        
+        # Create User
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=password,
+            first_name=first_name,
+            last_name=last_name
+        )
+        
+        # Create linked Employee (same as RegisterSerializer)
+        Employee.objects.create(
+            user=user,
+            first_name=first_name,
+            last_name=last_name,
+            email=email,
+            role='mobiux_employee',  # default role
+            department='mobiux',  # default department
+            hire_date=timezone.now(),
+        )
+        
+        return user, True  # User created, created=True
