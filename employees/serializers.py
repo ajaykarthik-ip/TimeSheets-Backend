@@ -13,16 +13,16 @@ class EmployeeSerializer(serializers.ModelSerializer):
         model = Employee
         fields = [
             'id', 'employee_id', 'username', 'password', 'first_name', 'last_name', 
-            'email', 'phone', 'role', 'department', 'hire_date', 'is_active', 
-            'hourly_rate', 'manager', 'manager_name', 'address', 'emergency_contact_name', 
-            'emergency_contact_phone', 'full_name', 'created_at', 'updated_at'
+            'email', 'phone', 'role', 'department', 'designation',  # Added designation
+            'hire_date', 'is_active', 'hourly_rate', 'manager', 'manager_name', 
+            'address', 'emergency_contact_name', 'emergency_contact_phone', 
+            'full_name', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'full_name', 'manager_name']
     
     def get_manager_name(self, obj):
         """Optimized manager name retrieval"""
-        if obj.manager_id:  # Use manager_id to avoid additional query
-            # This assumes manager is already prefetched in the view
+        if obj.manager_id:
             return obj.manager.full_name if obj.manager else None
         return None
     
@@ -31,14 +31,13 @@ class EmployeeSerializer(serializers.ModelSerializer):
         password = validated_data.pop('password', None)
         
         if not username:
-            # Auto-generate username from email
             username = validated_data['email'].split('@')[0]
         
         # Create user account
         user = User.objects.create_user(
             username=username,
             email=validated_data['email'],
-            password=password or 'temppass123',  # Default password if not provided
+            password=password or 'temppass123',
             first_name=validated_data['first_name'],
             last_name=validated_data['last_name']
         )
@@ -58,42 +57,46 @@ class EmployeeSerializer(serializers.ModelSerializer):
                 user.username = username
             if password:
                 user.set_password(password)
-            # Update user's name and email
             user.first_name = validated_data.get('first_name', instance.first_name)
             user.last_name = validated_data.get('last_name', instance.last_name)
             user.email = validated_data.get('email', instance.email)
             user.save()
         
-        # Update employee
         return super().update(instance, validated_data)
 
 class EmployeeListSerializer(serializers.ModelSerializer):
     """Optimized serializer for list views - only essential fields"""
     full_name = serializers.ReadOnlyField()
     manager_name = serializers.CharField(source='manager.full_name', read_only=True)
+    department_display = serializers.CharField(source='get_department_display', read_only=True)
+    designation_display = serializers.CharField(source='get_designation_display', read_only=True)
+    role_display = serializers.CharField(source='get_role_display', read_only=True)
     
     class Meta:
         model = Employee
         fields = [
-            'id', 'employee_id', 'full_name', 'email', 'role', 
-            'department', 'manager_name', 'is_active', 'hire_date'
+            'id', 'employee_id', 'full_name', 'email', 'role', 'role_display',
+            'department', 'department_display', 'designation', 'designation_display',
+            'manager_name', 'is_active', 'hire_date'
         ]
 
 class EmployeeMinimalSerializer(serializers.ModelSerializer):
     """Ultra-minimal serializer for dropdowns and quick lookups"""
     full_name = serializers.ReadOnlyField()
+    designation_display = serializers.CharField(source='get_designation_display', read_only=True)
     
     class Meta:
         model = Employee
-        fields = ['id', 'employee_id', 'full_name', 'role', 'is_active']
+        fields = ['id', 'employee_id', 'full_name', 'role', 'designation_display', 'is_active']
 
 class ManagerListSerializer(serializers.ModelSerializer):
-    """Serializer for manager dropdown lists"""
+    """Serializer for manager dropdown lists (admin role only)"""
     full_name = serializers.ReadOnlyField()
+    designation_display = serializers.CharField(source='get_designation_display', read_only=True)
     
     class Meta:
         model = Employee
-        fields = ['id', 'employee_id', 'full_name']
+        fields = ['id', 'employee_id', 'full_name', 'designation_display']
 
 class EmployeeStatsSerializer(serializers.Serializer):
     """Serializer for employee statistics"""
@@ -101,4 +104,5 @@ class EmployeeStatsSerializer(serializers.Serializer):
     active_employees = serializers.IntegerField()
     by_department = serializers.DictField()
     by_role = serializers.DictField()
+    by_designation = serializers.DictField()  # Added designation stats
     recent_hires = serializers.IntegerField()

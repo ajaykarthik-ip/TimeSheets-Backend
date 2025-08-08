@@ -1,3 +1,5 @@
+# Update your authentication/serializers.py
+
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate 
@@ -21,19 +23,19 @@ class RegisterSerializer(serializers.ModelSerializer):
         validated_data.pop('password_confirm')
         user = User.objects.create_user(**validated_data)
 
-        # ✅ Create linked Employee with default values
+        # ✅ Create linked Employee with new structure
         Employee.objects.create(
             user=user,
             first_name=user.first_name,
             last_name=user.last_name,
             email=user.email,
-            role='intern',  # default role
-            department='engineering',  # default department
+            role='mobiux_employee',  # default role
+            department='engineering_development',  # default department
+            designation='software_engineer',  # default designation
             hire_date=timezone.now(),
         )
 
         return user
-
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -44,14 +46,12 @@ class LoginSerializer(serializers.Serializer):
         password = data.get('password')
         
         if email and password:
-            # Try to find user by email
             try:
                 user = User.objects.get(email=email)
                 username = user.username
             except User.DoesNotExist:
                 raise serializers.ValidationError('Invalid email or password')
             
-            # Authenticate with username
             user = authenticate(username=username, password=password)
             
             if user:
@@ -94,18 +94,15 @@ class GoogleLoginSerializer(serializers.Serializer):
         
         email = google_data['email']
         
-        # Check if user already exists
         try:
             user = User.objects.get(email=email)
-            return user, False  # User exists, created=False
+            return user, False
         except User.DoesNotExist:
             pass
         
-        # Create new user
         username = generate_username_from_email(email)
         password = generate_secure_password()
         
-        # Split full name if first/last names are empty
         first_name = google_data.get('first_name', '')
         last_name = google_data.get('last_name', '')
         
@@ -114,7 +111,6 @@ class GoogleLoginSerializer(serializers.Serializer):
             first_name = name_parts[0]
             last_name = name_parts[1] if len(name_parts) > 1 else ''
         
-        # Create User
         user = User.objects.create_user(
             username=username,
             email=email,
@@ -123,15 +119,16 @@ class GoogleLoginSerializer(serializers.Serializer):
             last_name=last_name
         )
         
-        # Create linked Employee (same as RegisterSerializer)
+        # Create linked Employee with new structure
         Employee.objects.create(
             user=user,
             first_name=first_name,
             last_name=last_name,
             email=email,
-            role='mobiux_employee',  # default role
-            department='mobiux',  # default department
+            role='user',  # default role
+            department='',  # default department  
+            designation='',  # default designation
             hire_date=timezone.now(),
         )
         
-        return user, True  # User created, created=True
+        return user, True
