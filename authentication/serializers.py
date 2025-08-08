@@ -30,8 +30,8 @@ class RegisterSerializer(serializers.ModelSerializer):
             last_name=user.last_name,
             email=user.email,
             role='mobiux_employee',  # default role
-            department='engineering_development',  # default department
-            designation='software_engineer',  # default designation
+            department='',  # default department
+            designation='',  # default designation
             hire_date=timezone.now(),
         )
 
@@ -125,7 +125,7 @@ class GoogleLoginSerializer(serializers.Serializer):
             first_name=first_name,
             last_name=last_name,
             email=email,
-            role='user',  # default role
+            role='mobiux_employee',  # default role
             department='',  # default department  
             designation='',  # default designation
             hire_date=timezone.now(),
