@@ -779,3 +779,99 @@ def debug_timesheet_create(request):
             return JsonResponse({'error': str(e)}, status=400)
     
     return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+# Add this new view to your timesheets/views.py file
+
+@csrf_exempt
+def admin_all_timesheets(request):
+    """
+    Admin-only endpoint to get ALL timesheet data without filtering
+    GET /api/timesheets/admin/all/
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    
+    # Check if user is admin
+    user_is_admin = False
+    
+    if request.user.is_staff or request.user.is_superuser:
+        user_is_admin = True
+    
+    try:
+        user_employee = request.user.employee
+        if user_employee and user_employee.role in ['admin', 'manager']:
+            user_is_admin = True
+    except Employee.DoesNotExist:
+        pass
+    
+    if not user_is_admin:
+        return JsonResponse({'error': 'Admin access required'}, status=403)
+    
+    if request.method == 'GET':
+        # Get ALL timesheets without any user-based filtering
+        timesheets = Timesheet.objects.select_related(
+            'employee', 'project', 'employee__user'
+        ).all()
+        
+        # Apply only explicit filters from query parameters
+        employee_id = request.GET.get('employee_id')
+        if employee_id:
+            timesheets = timesheets.filter(employee__employee_id=employee_id)
+        
+        project_id = request.GET.get('project_id')
+        if project_id:
+            timesheets = timesheets.filter(project_id=project_id)
+        
+        status_filter = request.GET.get('status')
+        if status_filter:
+            timesheets = timesheets.filter(status=status_filter)
+        
+        # Date filtering
+        date_from = request.GET.get('date_from')
+        date_to = request.GET.get('date_to')
+        
+        if date_from:
+            try:
+                date_from_obj = datetime.strptime(date_from, '%Y-%m-%d').date()
+                timesheets = timesheets.filter(date__gte=date_from_obj)
+            except ValueError:
+                return JsonResponse({'error': 'Invalid date_from format. Use YYYY-MM-DD'}, status=400)
+        
+        if date_to:
+            try:
+                date_to_obj = datetime.strptime(date_to, '%Y-%m-%d').date()
+                timesheets = timesheets.filter(date__lte=date_to_obj)
+            except ValueError:
+                return JsonResponse({'error': 'Invalid date_to format. Use YYYY-MM-DD'}, status=400)
+        
+        activity_type = request.GET.get('activity_type')
+        if activity_type:
+            timesheets = timesheets.filter(activity_type__icontains=activity_type)
+        
+        # Pagination
+        page_size = min(int(request.GET.get('page_size', 1000)), 1000)  # Higher limit for admin
+        page = int(request.GET.get('page', 1))
+        
+        paginator = Paginator(timesheets, page_size)
+        page_obj = paginator.get_page(page)
+        
+        serializer = TimesheetListSerializer(page_obj.object_list, many=True)
+        
+        return JsonResponse({
+            'count': paginator.count,
+            'total_pages': paginator.num_pages,
+            'current_page': page,
+            'page_size': page_size,
+            'timesheets': serializer.data,
+            'filters_applied': {
+                'date_from': date_from,
+                'date_to': date_to,
+                'employee_id': employee_id,
+                'project_id': project_id,
+                'activity_type': activity_type,
+                'status': status_filter
+            },
+            'note': 'This endpoint returns ALL timesheet data for admin users'
+        })
+    
+    return JsonResponse({'error': 'Method not allowed'}, status=405)

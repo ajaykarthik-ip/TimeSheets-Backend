@@ -6,6 +6,9 @@ urlpatterns = [
     path('', views.timesheet_list_create, name='timesheet-list-create'),
     path('<int:pk>/', views.timesheet_detail, name='timesheet-detail'),
     
+    # Admin-specific endpoints
+    path('admin/all/', views.admin_all_timesheets, name='admin-all-timesheets'),
+    
     # User-specific endpoints
     path('my-timesheets/', views.my_timesheets, name='my-timesheets'),
     path('current-user/', views.current_user_employee, name='current-user-employee'),
