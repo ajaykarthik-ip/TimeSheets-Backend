@@ -66,22 +66,6 @@ TEMPLATES = [
 WSGI_APPLICATION = 'timesheet_backend.wsgi.application'
 
 # Database - Neon PostgreSQL with optimizations
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': config('DB_NAME'),
-#         'USER': config('DB_USER'),
-#         'PASSWORD': config('DB_PASSWORD'),
-#         'HOST': config('DB_HOST'),
-#         'PORT': config('DB_PORT', default=5432),
-#         'OPTIONS': {
-#             'sslmode': 'require',
-#         },
-#         'CONN_MAX_AGE': 600,  # Keep connections alive for 10 minutes
-#     }
-# }
-
-#local setup
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -90,13 +74,29 @@ DATABASES = {
         'PASSWORD': config('DB_PASSWORD'),
         'HOST': config('DB_HOST'),
         'PORT': config('DB_PORT', default=5432),
-        'CONN_MAX_AGE': 600,
-        # Remove 'OPTIONS' or comment it out
-        # 'OPTIONS': {
-        #     'sslmode': 'require',
-        # },
+        'OPTIONS': {
+            'sslmode': 'require',
+        },
+        'CONN_MAX_AGE': 600,  # Keep connections alive for 10 minutes
     }
 }
+
+# #local setup
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': config('DB_NAME'),
+#         'USER': config('DB_USER'),
+#         'PASSWORD': config('DB_PASSWORD'),
+#         'HOST': config('DB_HOST'),
+#         'PORT': config('DB_PORT', default=5432),
+#         'CONN_MAX_AGE': 600,
+#         # Remove 'OPTIONS' or comment it out
+#         # 'OPTIONS': {
+#         #     'sslmode': 'require',
+#         # },
+#     }
+# }
 
 
 # Password validation
