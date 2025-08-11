@@ -34,6 +34,7 @@ DISABLE_CSRF = True
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -198,6 +199,8 @@ if DEBUG:
         },
     }
 
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+ALLOWED_HOSTS.append('.onrender.com')
 
 GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID')
 GOOGLE_CLIENT_SECRET = config('GOOGLE_CLIENT_SECRET')
