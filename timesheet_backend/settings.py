@@ -10,7 +10,7 @@ SECRET_KEY = config('SECRET_KEY', default='your-default-secret-key')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '.onrender.com']
 
 # Application definition
 INSTALLED_APPS = [
@@ -28,23 +28,18 @@ INSTALLED_APPS = [
     'timesheets',
 ]
 
-# Disable CSRF for development (API testing)
-DISABLE_CSRF = True
-
+# ✅ FIXED: Proper middleware order for API authentication
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',           # First for CORS
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',  # Before auth
     'django.middleware.common.CommonMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    # ✅ REMOVED CSRF middleware entirely for API-only backend
+    'django.contrib.auth.middleware.AuthenticationMiddleware',  # After sessions
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
-
-# Only add CSRF middleware if not disabled
-if not DISABLE_CSRF:
-    MIDDLEWARE.insert(4, 'django.middleware.csrf.CsrfViewMiddleware')
 
 ROOT_URLCONF = 'timesheet_backend.urls'
 
@@ -82,24 +77,6 @@ DATABASES = {
     }
 }
 
-# #local setup
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': config('DB_NAME'),
-#         'USER': config('DB_USER'),
-#         'PASSWORD': config('DB_PASSWORD'),
-#         'HOST': config('DB_HOST'),
-#         'PORT': config('DB_PORT', default=5432),
-#         'CONN_MAX_AGE': 600,
-#         # Remove 'OPTIONS' or comment it out
-#         # 'OPTIONS': {
-#         #     'sslmode': 'require',
-#         # },
-#     }
-# }
-
-
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -124,11 +101,12 @@ USE_TZ = True
 
 # Static files
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# REST Framework configuration with optimizations
+# ✅ FIXED: REST Framework configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.SessionAuthentication',
@@ -140,76 +118,96 @@ REST_FRAMEWORK = {
         'rest_framework.renderers.JSONRenderer',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 25,  # Default pagination
+    'PAGE_SIZE': 25,
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.UserRateThrottle'
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'user': '1000/hour'  # Rate limiting
+        'user': '1000/hour'
     }
 }
 
-# CORS settings
+# ✅ FIXED: CORS settings with proper credentials support
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
+    # Add your frontend production domain here when you deploy
+    # "https://your-frontend-domain.com",
 ]
+
+# ✅ CRITICAL: This enables cookie-based authentication
 CORS_ALLOW_CREDENTIALS = True
 
-# CSRF settings - Updated for cross-origin
+# ✅ FIXED: Session settings for cross-origin requests
+SESSION_COOKIE_AGE = 86400  # 24 hours
+SESSION_COOKIE_HTTPONLY = True  # Security: prevent JS access
+SESSION_COOKIE_SAMESITE = 'Lax'  # 'Lax' works with HTTP development
+SESSION_COOKIE_SECURE = False  # False for HTTP development
+SESSION_COOKIE_DOMAIN = None  # Don't restrict domain
+
+# ✅ FIXED: CSRF settings (disabled for API-only backend)
 CSRF_COOKIE_SECURE = False
-CSRF_USE_SESSIONS = False
+CSRF_USE_SESSIONS = False  
 CSRF_COOKIE_HTTPONLY = False
-CSRF_COOKIE_SAMESITE = None  # Required for cross-origin
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:8000",
-    "http://127.0.0.1:8000",
+    "http://127.0.0.1:8000", 
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "https://timesheets-backend-sdmk.onrender.com",  # Your backend domain
+    "https://timesheets-backend-sdmk.onrender.com",
 ]
-
-# Session settings - Updated for cross-origin
-SESSION_COOKIE_AGE = 86400  # 24 hours
-SESSION_COOKIE_HTTPONLY = False
-SESSION_COOKIE_SAMESITE = None  # Required for cross-origin cookies
-SESSION_COOKIE_SECURE = False  # Must be False when using HTTP with SameSite=None
-SESSION_COOKIE_DOMAIN = None     # Don't restrict to specific domain
 
 # Cache configuration for performance
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
         'LOCATION': 'cache_table',
-        'TIMEOUT': 300,  # 5 minutes default
+        'TIMEOUT': 300,
         'OPTIONS': {
             'MAX_ENTRIES': 1000,
         }
     }
 }
 
-# Logging for debugging queries in development
-if DEBUG:
-    LOGGING = {
-        'version': 1,
-        'disable_existing_loggers': False,
-        'handlers': {
-            'console': {
-                'class': 'logging.StreamHandler',
-            },
+# ✅ ADDED: Enhanced logging for debugging authentication issues
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
         },
-        'loggers': {
-            'django.db.backends': {
-                'handlers': ['console'],
-                'level': 'INFO',  # Change to DEBUG to see all queries
-            },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
         },
-    }
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': 'django.log',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+        },
+        'authentication': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+        },
+        'rest_framework': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+        },
+    },
+}
 
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-ALLOWED_HOSTS.append('.onrender.com')
-
+# Google OAuth settings
 GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID')
 GOOGLE_CLIENT_SECRET = config('GOOGLE_CLIENT_SECRET')
