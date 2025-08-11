@@ -173,9 +173,11 @@ CSRF_TRUSTED_ORIGINS = [
 
 # Session settings - Updated for cross-origin
 SESSION_COOKIE_AGE = 86400  # 24 hours
-SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SAMESITE = 'None'  # Required for cross-origin cookies
+SESSION_COOKIE_HTTPONLY = False
+SESSION_COOKIE_SAMESITE = None  # Required for cross-origin cookies
 SESSION_COOKIE_SECURE = False  # Must be False when using HTTP with SameSite=None
+SESSION_COOKIE_DOMAIN = None     # Don't restrict to specific domain
+
 # Cache configuration for performance
 CACHES = {
     'default': {
