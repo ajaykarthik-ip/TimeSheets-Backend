@@ -133,8 +133,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
-    # Add your frontend production domain here when you deploy
-    # "https://your-frontend-domain.com",
+    "https://time-sheets-je2h.vercel.app",
 ]
 
 # ✅ CRITICAL: This enables cookie-based authentication
