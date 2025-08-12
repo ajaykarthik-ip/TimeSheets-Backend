@@ -4,15 +4,11 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = config('SECRET_KEY', default='your-default-secret-key')
-
-# SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '.onrender.com']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '.onrender.com', '.render.com']
 
-# Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -28,15 +24,13 @@ INSTALLED_APPS = [
     'timesheets',
 ]
 
-# ✅ FIXED: Proper middleware order for API authentication
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',           # First for CORS
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',  # Before auth
+    'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    # ✅ REMOVED CSRF middleware entirely for API-only backend
-    'django.contrib.auth.middleware.AuthenticationMiddleware',  # After sessions
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -61,7 +55,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'timesheet_backend.wsgi.application'
 
-# Database - Neon PostgreSQL with optimizations
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -73,11 +66,10 @@ DATABASES = {
         'OPTIONS': {
             'sslmode': 'require',
         },
-        'CONN_MAX_AGE': 600,  # Keep connections alive for 10 minutes
+        'CONN_MAX_AGE': 600,
     }
 }
 
-# Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -93,20 +85,16 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-# Internationalization
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-# Static files
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# ✅ FIXED: REST Framework configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.SessionAuthentication',
@@ -127,38 +115,36 @@ REST_FRAMEWORK = {
     }
 }
 
-# ✅ FIXED: CORS settings with proper credentials support
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
     "https://time-sheets-je2h.vercel.app",
+    "https://timesheets-backend-sdmk.onrender.com",
 ]
 
-# ✅ CRITICAL: This enables cookie-based authentication
 CORS_ALLOW_CREDENTIALS = True
 
-# ✅ FIXED: Session settings for cross-origin requests
-SESSION_COOKIE_AGE = 86400  # 24 hours
-SESSION_COOKIE_HTTPONLY = True  # Security: prevent JS access
-SESSION_COOKIE_SAMESITE = 'Lax'  # 'Lax' works with HTTP development
-SESSION_COOKIE_SECURE = False  # False for HTTP development
-SESSION_COOKIE_DOMAIN = None  # Don't restrict domain
+SESSION_COOKIE_AGE = 86400
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'None'
+SESSION_COOKIE_SECURE = True
+SESSION_COOKIE_DOMAIN = None
 
-# ✅ FIXED: CSRF settings (disabled for API-only backend)
-CSRF_COOKIE_SECURE = False
-CSRF_USE_SESSIONS = False  
+CSRF_COOKIE_SECURE = True
+CSRF_USE_SESSIONS = False
 CSRF_COOKIE_HTTPONLY = False
+CSRF_COOKIE_SAMESITE = 'None'
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:8000",
     "http://127.0.0.1:8000", 
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "https://timesheets-backend-sdmk.onrender.com",
+    "https://time-sheets-je2h.vercel.app",
 ]
 
-# Cache configuration for performance
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
@@ -170,7 +156,6 @@ CACHES = {
     }
 }
 
-# ✅ ADDED: Enhanced logging for debugging authentication issues
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -207,6 +192,12 @@ LOGGING = {
     },
 }
 
-# Google OAuth settings
 GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID')
 GOOGLE_CLIENT_SECRET = config('GOOGLE_CLIENT_SECRET')
+
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = False
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = 'DENY'
