@@ -10,27 +10,61 @@ from django.http import JsonResponse
 import json
 from .serializers import RegisterSerializer, LoginSerializer, UserSerializer, GoogleLoginSerializer
 
+# 🔥 ADD THIS CORS DECORATOR FOR ALL VIEWS
+def add_cors_headers(response, request):
+    """Add CORS headers to response"""
+    origin = request.headers.get('Origin')
+    if origin and origin in [
+        'https://time-sheets-je2h.vercel.app',
+        'http://localhost:3000',
+        'http://127.0.0.1:3000'
+    ]:
+        response["Access-Control-Allow-Origin"] = origin
+    
+    response["Access-Control-Allow-Credentials"] = "true"
+    response["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS, PUT, DELETE"
+    response["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-CSRFToken, X-Requested-With"
+    response["Access-Control-Max-Age"] = "86400"
+    return response
+
 @csrf_exempt
+@require_http_methods(["POST", "OPTIONS"])
 def register_view(request):
     """Register a new user - Pure Django view"""
+    if request.method == 'OPTIONS':
+        # Handle preflight request
+        response = JsonResponse({'status': 'ok'})
+        return add_cors_headers(response, request)
+        
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
             serializer = RegisterSerializer(data=data)
             if serializer.is_valid():
                 user = serializer.save()
-                return JsonResponse({
+                response = JsonResponse({
                     'message': 'User created successfully',
                     'user': UserSerializer(user).data
                 }, status=201)
-            return JsonResponse(serializer.errors, status=400)
+                return add_cors_headers(response, request)
+            response = JsonResponse(serializer.errors, status=400)
+            return add_cors_headers(response, request)
         except Exception as e:
-            return JsonResponse({'error': str(e)}, status=400)
-    return JsonResponse({'error': 'Method not allowed'}, status=405)
+            response = JsonResponse({'error': str(e)}, status=400)
+            return add_cors_headers(response, request)
+    
+    response = JsonResponse({'error': 'Method not allowed'}, status=405)
+    return add_cors_headers(response, request)
 
 @csrf_exempt
+@require_http_methods(["POST", "OPTIONS"])
 def login_view(request):
     """Login user - Pure Django view"""
+    if request.method == 'OPTIONS':
+        # Handle preflight request
+        response = JsonResponse({'status': 'ok'})
+        return add_cors_headers(response, request)
+        
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
@@ -38,27 +72,43 @@ def login_view(request):
             if serializer.is_valid():
                 user = serializer.validated_data['user']
                 login(request, user)
-                return JsonResponse({
+                response = JsonResponse({
                     'message': 'Login successful',
                     'user': UserSerializer(user).data
                 }, status=200)
-            return JsonResponse(serializer.errors, status=400)
+                return add_cors_headers(response, request)
+            response = JsonResponse(serializer.errors, status=400)
+            return add_cors_headers(response, request)
         except Exception as e:
-            return JsonResponse({'error': str(e)}, status=400)
-    return JsonResponse({'error': 'Method not allowed'}, status=405)
+            response = JsonResponse({'error': str(e)}, status=400)
+            return add_cors_headers(response, request)
+    
+    response = JsonResponse({'error': 'Method not allowed'}, status=405)
+    return add_cors_headers(response, request)
 
 @csrf_exempt
+@require_http_methods(["POST", "OPTIONS"])
 def logout_view(request):
     """Logout user - Pure Django view"""
+    if request.method == 'OPTIONS':
+        # Handle preflight request
+        response = JsonResponse({'status': 'ok'})
+        return add_cors_headers(response, request)
+        
     if request.method == 'POST':
         try:
             if request.user.is_authenticated:
                 logout(request)
-                return JsonResponse({'message': 'Logout successful'}, status=200)
-            return JsonResponse({'error': 'Not authenticated'}, status=401)
+                response = JsonResponse({'message': 'Logout successful'}, status=200)
+                return add_cors_headers(response, request)
+            response = JsonResponse({'error': 'Not authenticated'}, status=401)
+            return add_cors_headers(response, request)
         except Exception as e:
-            return JsonResponse({'error': str(e)}, status=400)
-    return JsonResponse({'error': 'Method not allowed'}, status=405)
+            response = JsonResponse({'error': str(e)}, status=400)
+            return add_cors_headers(response, request)
+    
+    response = JsonResponse({'error': 'Method not allowed'}, status=405)
+    return add_cors_headers(response, request)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -69,16 +119,29 @@ def user_profile(request):
     }, status=status.HTTP_200_OK)
 
 @csrf_exempt
+@require_http_methods(["GET", "OPTIONS"])
 def csrf_token(request):
     """Get CSRF token for frontend"""
+    if request.method == 'OPTIONS':
+        # Handle preflight request
+        response = JsonResponse({'status': 'ok'})
+        return add_cors_headers(response, request)
+        
     from django.middleware.csrf import get_token
-    return JsonResponse({
+    response = JsonResponse({
         'csrfToken': get_token(request)
     })
+    return add_cors_headers(response, request)
 
 @csrf_exempt
+@require_http_methods(["POST", "OPTIONS"])
 def google_login_view(request):
     """Login/Register user with Google OAuth - Pure Django view"""
+    if request.method == 'OPTIONS':
+        # Handle preflight request
+        response = JsonResponse({'status': 'ok'})
+        return add_cors_headers(response, request)
+        
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
@@ -100,7 +163,7 @@ def google_login_view(request):
                 else:
                     message = 'Logged in successfully with Google'
                 
-                return JsonResponse({
+                response = JsonResponse({
                     'message': message,
                     'user': UserSerializer(user).data,
                     'created': created,
@@ -109,18 +172,22 @@ def google_login_view(request):
                         'email_verified': google_data.get('email_verified', False)
                     }
                 }, status=200)
+                return add_cors_headers(response, request)
             
-            return JsonResponse(serializer.errors, status=400)
+            response = JsonResponse(serializer.errors, status=400)
+            return add_cors_headers(response, request)
             
         except Exception as e:
-            return JsonResponse({
+            response = JsonResponse({
                 'error': 'Google login failed',
                 'details': str(e)
             }, status=400)
+            return add_cors_headers(response, request)
     
-    return JsonResponse({'error': 'Method not allowed'}, status=405)
+    response = JsonResponse({'error': 'Method not allowed'}, status=405)
+    return add_cors_headers(response, request)
 
-# CORS Test View - Add this temporarily for debugging
+# 🔧 CORS Test View
 @csrf_exempt
 @require_http_methods(["GET", "POST", "OPTIONS"])
 def cors_test(request):
@@ -145,14 +212,4 @@ def cors_test(request):
             'session_key': request.session.session_key if hasattr(request.session, 'session_key') else 'No session',
         })
     
-    # Add explicit CORS headers for testing
-    origin = request.headers.get('Origin')
-    if origin:
-        response["Access-Control-Allow-Origin"] = origin
-    response["Access-Control-Allow-Credentials"] = "true"
-    response["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS, PUT, DELETE"
-    response["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-CSRFToken, X-Requested-With"
-    response["Access-Control-Max-Age"] = "86400"
-    
-    print(f"📤 CORS Test response: {response.status_code}")
-    return response
+    return add_cors_headers(response, request)
