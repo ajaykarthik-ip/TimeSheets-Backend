@@ -8,5 +8,5 @@ urlpatterns = [
     path('profile/', views.user_profile, name='user-profile'),
     path('csrf/', views.csrf_token, name='csrf-token'),
     path('google-login/', views.google_login_view, name='google-login'),  # NEW LINE
-
+    path('cors-test/', views.cors_test, name='cors-test'), 
 ]

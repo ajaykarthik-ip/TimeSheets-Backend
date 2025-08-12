@@ -4,6 +4,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from django.contrib.auth import login, logout
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
 from django.utils.decorators import method_decorator
 from django.http import JsonResponse
 import json
@@ -118,3 +119,40 @@ def google_login_view(request):
             }, status=400)
     
     return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+# CORS Test View - Add this temporarily for debugging
+@csrf_exempt
+@require_http_methods(["GET", "POST", "OPTIONS"])
+def cors_test(request):
+    """Test CORS configuration - TEMPORARY DEBUG VIEW"""
+    
+    print(f"🧪 CORS Test: {request.method} request from {request.headers.get('Origin', 'unknown origin')}")
+    
+    if request.method == "OPTIONS":
+        # Handle preflight request
+        print("✈️ Handling preflight OPTIONS request")
+        response = JsonResponse({'status': 'preflight ok'})
+    else:
+        # Handle actual request
+        print("📡 Handling actual request")
+        response = JsonResponse({
+            'status': 'CORS test successful! 🎉',
+            'method': request.method,
+            'timestamp': str(request.META.get('HTTP_DATE', 'no date')),
+            'origin': request.headers.get('Origin', 'No origin header'),
+            'user_agent': request.headers.get('User-Agent', 'No user agent'),
+            'cookies_received': len(request.COOKIES),
+            'session_key': request.session.session_key if hasattr(request.session, 'session_key') else 'No session',
+        })
+    
+    # Add explicit CORS headers for testing
+    origin = request.headers.get('Origin')
+    if origin:
+        response["Access-Control-Allow-Origin"] = origin
+    response["Access-Control-Allow-Credentials"] = "true"
+    response["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS, PUT, DELETE"
+    response["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-CSRFToken, X-Requested-With"
+    response["Access-Control-Max-Age"] = "86400"
+    
+    print(f"📤 CORS Test response: {response.status_code}")
+    return response
