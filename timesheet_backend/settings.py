@@ -7,7 +7,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY', default='your-default-secret-key')
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '.onrender.com', '.render.com']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '.onrender.com', '.render.com', '.vercel.app']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -115,6 +115,7 @@ REST_FRAMEWORK = {
     }
 }
 
+# 🔥 ENHANCED CORS CONFIGURATION
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -125,6 +126,31 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'access-control-allow-credentials',
+    'access-control-allow-origin',
+]
+
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+CORS_PREFLIGHT_MAX_AGE = 86400
 
 SESSION_COOKIE_AGE = 86400
 SESSION_COOKIE_HTTPONLY = True
@@ -187,6 +213,10 @@ LOGGING = {
         },
         'rest_framework': {
             'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+        },
+        'corsheaders': {
+            'handlers': ['console'],
             'level': 'DEBUG',
         },
     },
