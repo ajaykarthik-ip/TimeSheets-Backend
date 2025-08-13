@@ -1,22 +1,16 @@
-from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
 from django.http import JsonResponse
 from django.core.paginator import Paginator
-from django.db.models import Prefetch, Count, Q
+from django.db.models import Prefetch, Q
 from django.core.cache import cache
 import json
-from datetime import timedelta, date
 from .models import Employee
 from .serializers import (
-    EmployeeSerializer, EmployeeListSerializer, 
-    EmployeeMinimalSerializer, ManagerListSerializer,
-    EmployeeStatsSerializer
+    EmployeeSerializer, EmployeeListSerializer
 )
 
 @csrf_exempt
